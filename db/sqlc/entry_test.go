@@ -11,7 +11,7 @@ import (
 	"github.com/techschool/simplebank/util"
 )
 
-func createRandomEntry(t *testing.T) Entries {
+func createRandomEntry(t *testing.T) Entry {
 	// insert random accounts
 	account := createRandomAccount(t)
 

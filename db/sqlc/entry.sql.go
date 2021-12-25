@@ -21,9 +21,9 @@ type CreateEntryParams struct {
 	Amount    int64 `json:"amount"`
 }
 
-func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entries, error) {
+func (q *Queries) CreateEntry(ctx context.Context, arg CreateEntryParams) (Entry, error) {
 	row := q.db.QueryRowContext(ctx, createEntry, arg.AccountID, arg.Amount)
-	var i Entries
+	var i Entry
 	err := row.Scan(
 		&i.ID,
 		&i.AccountID,
@@ -48,9 +48,9 @@ SELECT id, account_id, amount, created_at FROM entries
 WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetEntry(ctx context.Context, id int64) (Entries, error) {
+func (q *Queries) GetEntry(ctx context.Context, id int64) (Entry, error) {
 	row := q.db.QueryRowContext(ctx, getEntry, id)
-	var i Entries
+	var i Entry
 	err := row.Scan(
 		&i.ID,
 		&i.AccountID,
@@ -72,15 +72,15 @@ type ListEntriesParams struct {
 	Offset int32 `json:"offset"`
 }
 
-func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Entries, error) {
+func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Entry, error) {
 	rows, err := q.db.QueryContext(ctx, listEntries, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Entries
+	var items []Entry
 	for rows.Next() {
-		var i Entries
+		var i Entry
 		if err := rows.Scan(
 			&i.ID,
 			&i.AccountID,
@@ -112,9 +112,9 @@ type UpdateEntryParams struct {
 	Amount int64 `json:"amount"`
 }
 
-func (q *Queries) UpdateEntry(ctx context.Context, arg UpdateEntryParams) (Entries, error) {
+func (q *Queries) UpdateEntry(ctx context.Context, arg UpdateEntryParams) (Entry, error) {
 	row := q.db.QueryRowContext(ctx, updateEntry, arg.ID, arg.Amount)
-	var i Entries
+	var i Entry
 	err := row.Scan(
 		&i.ID,
 		&i.AccountID,
