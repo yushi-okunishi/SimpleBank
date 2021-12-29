@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	mockdb "github.com/techschool/simplebank/db/mock"
@@ -112,12 +113,74 @@ func randomAccount() db.Account {
 	}
 }
 
-func requireBodyMatchAccount(t *testing.T, body *bytes.Buffer, account db.Account) {
+func unmarshalAccount(body *bytes.Buffer) (account db.Account, err error) {
 	data, err := ioutil.ReadAll(body)
-	require.NoError(t, err)
+	if err != nil {
+		return db.Account{}, err
+	}
+	err = json.Unmarshal(data, &account)
+	if err != nil {
+		return db.Account{}, err
+	}
+	return account, nil
+}
 
-	var gotAccount db.Account
-	err = json.Unmarshal(data, &gotAccount)
+func requireBodyMatchAccount(t *testing.T, body *bytes.Buffer, account db.Account) {
+	gotAccount, err := unmarshalAccount(body)
 	require.NoError(t, err)
 	require.Equal(t, account, gotAccount)
+}
+
+func TestServer_createAccount(t *testing.T) {
+	account := randomAccount()
+	account.Balance = 0
+
+	tests := []struct {
+		name          string
+		body          gin.H
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			body: gin.H{
+				"owner":    account.Owner,
+				"currency": account.Currency,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateAccountParams{
+					Owner:    account.Owner,
+					Currency: account.Currency,
+					Balance:  0,
+				}
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Eq(arg)).
+					Times(1).
+					Return(account, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				requireBodyMatchAccount(t, recorder.Body, account)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+			tt.buildStubs(store)
+			server := NewServer(store)
+			recorder := httptest.NewRecorder()
+
+			targetURL := "/accounts"
+			data, err := json.Marshal(tt.body)
+			request, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewReader(data))
+			require.NoError(t, err)
+
+			server.router.ServeHTTP(recorder, request)
+			tt.checkResponse(t, recorder)
+		})
+	}
 }
